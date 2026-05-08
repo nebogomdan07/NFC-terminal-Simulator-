@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart POS v2.1 Professional</title>
+    <style>
+        :root {
+            --bg: #000000;
+            --blue: linear-gradient(135deg, #00d2ff, #3a7bd5);
+            --green: linear-gradient(135deg, #56ab2f, #a8e063);
+            --red: linear-gradient(135deg, #cb2d3e, #ef473a);
+            --yellow: linear-gradient(135deg, #f2994a, #f2c94c);
+            --glass: rgba(255, 255, 255, 0.1);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { 
+            background-color: var(--bg); 
+            color: #fff; 
+            margin: 0; 
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .screen {
+            display: none;
+            width: 100vw;
+            height: 100vh;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 40px 20px;
+            position: absolute;
+        }
+        .active { display: flex; }
+
+        /* HEADER */
+        .info-block { text-align: center; }
+        #time { font-size: 4rem; font-weight: 200; }
+        #date { font-size: 1.2rem; color: #aaa; text-transform: uppercase; letter-spacing: 2px; }
+
+        /* BUTTONS */
+        .btn-sq {
+            border: none;
+            border-radius: 24px;
+            color: white;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.1s, filter 0.2s;
+            cursor: pointer;
+        }
+        .btn-sq:active { transform: scale(0.92); filter: brightness(1.2); }
+
+        #fs-toggle { background: var(--glass); padding: 10px 20px; border-radius: 12px; border: 1px solid #333; margin-bottom: 20px; }
+        .main-pay-btn { background: var(--blue); width: 100%; height: 80px; font-size: 1.8rem; box-shadow: 0 10px 30px rgba(58, 123, 213, 0.4); }
+
+        /* NUMPAD */
+        #amount-view { font-size: 5rem; font-weight: 300; margin: 20px 0; }
+        .grid-numpad {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            width: 100%;
+            max-width: 400px;
+        }
+        .num-key { background: #1a1a1a; height: 85px; font-size: 2.2rem; border-radius: 20px; }
+        .wide-key {
+            grid-column: span 3;
+            height: 70px;
+            background: var(--yellow);
+            font-size: 2rem;
+            margin-top: 10px;
+        }
+        .submit-pay { background: var(--green); width: 100%; height: 80px; margin-top: 20px; font-size: 1.5rem; }
+
+        /* NFC ZONE */
+        .nfc-container {
+            width: 280px;
+            height: 380px;
+            border: 3px dashed rgba(0, 210, 255, 0.5);
+            border-radius: 40px;
+            background: rgba(0, 210, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .nfc-icon-wrap { font-size: 5rem; text-align: center; }
+        .nfc-hint { margin-top: 20px; color: #00d2ff; font-weight: 300; letter-spacing: 1px; text-align: center; padding: 0 10px; }
+        
+        /* STATUS */
+        .status-dots { display: flex; gap: 20px; margin-bottom: 40px; }
+        .s-dot { width: 25px; height: 25px; border-radius: 50%; background: #222; transition: 0.1s; }
+        .s-dot.lit { background: #a8e063; box-shadow: 0 0 20px #a8e063; }
+        #status-label { font-size: 1.8rem; font-weight: 300; color: #888; text-align: center; }
+        .success-mark { font-size: 8rem; color: #a8e063; display: none; }
+
+    </style>
+</head>
+<body>
+
+<div id="scr-start" class="screen active">
+    <button id="fs-toggle" onclick="toggleFS()">ТОРКНІТЬСЯ ДЛЯ FULLSCREEN</button>
+    <div class="info-block">
+        <div id="time">00:00</div>
+        <div id="date">Завантаження...</div>
+    </div>
+    <button class="btn-sq main-pay-btn" onclick="goNext('scr-num')">ОПЛАТА</button>
+</div>
+
+<div id="scr-num" class="screen">
+    <div id="amount-view">0</div>
+    <div class="grid-numpad">
+        <button class="btn-sq num-key" onclick="press('1')">1</button>
+        <button class="btn-sq num-key" onclick="press('2')">2</button>
+        <button class="btn-sq num-key" onclick="press('3')">3</button>
+        <button class="btn-sq num-key" onclick="press('4')">4</button>
+        <button class="btn-sq num-key" onclick="press('5')">5</button>
+        <button class="btn-sq num-key" onclick="press('6')">6</button>
+        <button class="btn-sq num-key" onclick="press('7')">7</button>
+        <button class="btn-sq num-key" onclick="press('8')">8</button>
+        <button class="btn-sq num-key" onclick="press('9')">9</button>
+        <button class="btn-sq num-key" style="background:var(--red)" onclick="press('C')">C</button>
+        <button class="btn-sq num-key" onclick="press('0')">0</button>
+        <button class="btn-sq num-key" onclick="press('00')">.00</button>
+        <button class="btn-sq wide-key" onclick="press('.')">.</button>
+    </div>
+    <button class="btn-sq submit-pay" onclick="initNFC()">ПІДТВЕРДИТИ</button>
+</div>
+
+<div id="scr-nfc" class="screen">
+    <div class="nfc-container" onclick="fakeTrigger()">
+        <div class="nfc-icon-wrap">
+            <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="#00d2ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2"></rect>
+                <line x1="2" y1="10" x2="22" y2="10"></line>
+                <path d="M7 15h.01"></path>
+                <path d="M2 12a5 5 0 0 1 5-5"></path>
+                <path d="M2 15a8 8 0 0 1 8-8"></path>
+            </svg>
+        </div>
+        <div class="nfc-hint" id="nfc-status-text">ОЧІКУВАННЯ NFC...</div>
+    </div>
+    <p style="color: #444;">Прикладіть картку до верхньої частини телефону</p>
+    <button class="btn-sq" style="background:none; color:#666;" onclick="location.reload()">СКАСУВАТИ</button>
+</div>
+
+<div id="scr-process" class="screen">
+    <div class="status-dots">
+        <div class="s-dot" id="d1"></div>
+        <div class="s-dot" id="d2"></div>
+        <div class="s-dot" id="d3"></div>
+        <div class="s-dot" id="d4"></div>
+    </div>
+    <div class="success-mark" id="ok-sign">✓</div>
+    <div id="status-label">Обробка...</div>
+</div>
+
+<script>
+    let amount = "";
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let nfcReader = null;
+
+    function toggleFS() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch(e => console.log(e));
+            document.getElementById('fs-toggle').style.display = 'none';
+        }
+    }
+
+    function updateClock() {
+        const now = new Date();
+        const days = ["Неділя", "Понеділок", "Вівторок", "Середа", "Четвер", "П'ятниця", "Субота"];
+        const months = ["Січня", "Лютого", "Березня", "Квітня", "Травня", "Червня", "Липня", "Серпня", "Вересня", "Жовтня", "Листопада", "Грудня"];
+        
+        document.getElementById('time').innerText = now.getHours().toString().padStart(2, '0') + "." + now.getMinutes().toString().padStart(2, '0') + "." + now.getSeconds().toString().padStart(2, '0');
+        document.getElementById('date').innerHTML = `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}<br>${days[now.getDay()]}`;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function goNext(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    function press(v) {
+        if (v === 'C') amount = "";
+        else if (amount.length < 8) {
+            if (v === '.' && amount.includes('.')) return;
+            amount += v;
+        }
+        document.getElementById('amount-view').innerText = amount || "0";
+    }
+
+    function beep(freq = 900, duration = 0.2) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = freq;
+        gain.gain.value = 0.3;
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // ГОЛОВНА ЛОГІКА NFC
+    async function initNFC() {
+        if (!amount || parseFloat(amount) === 0) {
+            alert("Введіть суму");
+            return;
+        }
+
+        goNext('scr-nfc');
+        const statusText = document.getElementById('nfc-status-text');
+
+        if (!('NDEFReader' in window)) {
+            statusText.innerText = "NFC НЕ ПІДТРИМУЄТЬСЯ (Тільки Chrome на Android)";
+            statusText.style.color = "#ff473a";
+            return;
+        }
+
+        try {
+            nfcReader = new NDEFReader();
+            await nfcReader.scan();
+            statusText.innerText = "ГОТОВИЙ ДО ЗЧИТУВАННЯ";
+
+            nfcReader.onreadingerror = () => {
+                beep(300, 0.5); // Низький звук помилки
+                statusText.innerText = "ПОМИЛКА ЗЧИТУВАННЯ. СПРОБУЙТЕ ЩЕ РАЗ";
+            };
+
+            nfcReader.onreading = (event) => {
+                const serial = event.serialNumber;
+                console.log("NFC Tag detected: " + serial);
+                handlePayment();
+            };
+
+        } catch (error) {
+            console.error("NFC Error: ", error);
+            statusText.innerText = "УВІМКНІТЬ NFC В НАЛАШТУВАННЯХ ТА ПЕРЕЙДІТЬ НА HTTPS";
+            statusText.style.color = "#ff473a";
+        }
+    }
+
+    // Для дебагу на ПК (клік на рамку)
+    function fakeTrigger() {
+        handlePayment();
+    }
+
+    function handlePayment() {
+        // Сигнал успішного зчитування
+        beep(1200, 0.1); 
+        setTimeout(() => beep(1200, 0.1), 150);
+
+        goNext('scr-process');
+        
+        const dots = document.querySelectorAll('.s-dot');
+        dots.forEach(d => d.classList.add('lit'));
+
+        setTimeout(() => {
+            dots.forEach(d => d.classList.remove('lit'));
+            document.getElementById('status-label').innerText = "Зв'язок із банком...";
+            
+            // Емуляція банківської транзакції
+            const delay = Math.floor(Math.random() * 3000) + 1000;
+            
+            setTimeout(() => {
+                document.getElementById('status-label').innerText = "ОПЛАЧЕНО";
+                document.getElementById('status-label').style.color = "#a8e063";
+                document.getElementById('ok-sign').style.display = "block";
+                
+                // Фінальний "успішний" біп
+                beep(1500, 0.4);
+
+                setTimeout(() => {
+                    location.reload(); 
+                }, 3500);
+            }, delay);
+
+        }, 600);
+    }
+
+    // Перевірка протоколу
+    if (window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') {
+        alert("Web NFC працює ТІЛЬКИ через HTTPS. На звичайному HTTP сканування не запуститься.");
+    }
+</script>
+</body>
+</html>
